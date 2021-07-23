@@ -1,20 +1,21 @@
 
 BR = "\n"
 
-Pronouns = %w[the a his her my your their our]
-VerbSpecs = %w[with for in and or] # Specifiers
-NounSpecs = %w[of under over]
+Numbers = %w[one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eightteen nineteen twenty]
+
+Pronouns = %w[the a his her my your their our] + Numbers
+VerbSpecs = %w[with in and] # Specifiers
+NounSpecs = %w[of for under over]
 Relatives = %w[me you myself yourself him her them us this that those these around]
 
 class Array
 	def next_phrase
-		if Relatives.include? self.first
-			return [self.shift]
-		end
-		
 		adj = []
 		if Pronouns.include? self.first
 			adj.push self.shift
+		end
+		if Relatives.include? self.first and adj == []
+			return [self.shift]
 		end
 		
 		while self.length > 0 and not Pronouns.include? self.first and not VerbSpecs.include? self.first and not Relatives.include? self.first
@@ -37,7 +38,7 @@ class Array
 
 		while self.length > 0
 			if VerbSpecs.include? self.first
-				kwargs[self.shift] = self.next_phrase
+				kwargs[self.shift.to_sym] = self.next_phrase
 			else
 				args.push self.next_phrase
 			end
@@ -87,25 +88,19 @@ class Array
 end
 
 Space = ' '
-def handler(fn,args,kwargs)
-	def internal
-		fn.call()
-	end
-end
+def spec_router(kwarg_names, fn)
+	lambda { |args,specs|
+		kwargs = {}
 
-Registry = {
-	'mix': lambda { |args,kwargs|
-		a = args[0]
-		b = kwargs['and']
-		device = kwargs['with']
-		
-		puts "I'm not sure you WANT to mix #{a.join Space} and #{b.join Space}" + if device then ",even with #{device.join Space}" else '' end
+		# Rename and add each kwarg
+		kwarg_names.each_pair do |spec,name|
+			kwargs[name] = specs[spec]
+		end
+
+		if (req_l = fn.parameters.select { |arg| arg[0] == :req }.length) != args.length
+			throw "#{req_l} arguments needed for command, but got #{args.length}"
+		end
+		# Call fn with argument dict
+		fn.call(*args,**kwargs)
 	}
-}
-
-while true
-	cmd,args,kwargs = get_cmd().parse_cmd!
-
-	fn = Registry[cmd.to_sym]
-	fn.call(args,kwargs)
 end
